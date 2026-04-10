@@ -119,6 +119,35 @@
     </div>
 </div>
 
+<!-- Modal Konfirmasi Delete -->
+<div class="modal fade" id="deleteModal" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title">
+                    <i class="fas fa-trash"></i> Konfirmasi Hapus
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Apakah Anda yakin ingin menghapus kategori <strong id="deleteCategoryName"></strong>?</p>
+                <p class="text-danger mb-0">
+                    <i class="fas fa-exclamation-triangle"></i> 
+                    <small>Perhatian: Menghapus kategori juga akan menghapus semua item yang terkait dengan kategori ini!</small>
+                </p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="fas fa-times"></i> Batal
+                </button>
+                <button type="button" class="btn btn-danger" id="confirmDeleteBtn">
+                    <i class="fas fa-trash"></i> Hapus
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 @endsection
 
 @push('styles')
@@ -136,11 +165,82 @@
         border-left: 4px solid #2196f3;
         border-radius: 8px;
     }
+    /* Toast notification styles */
+    .notification-toast {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        z-index: 9999;
+        min-width: 300px;
+        animation: slideIn 0.3s ease-out;
+    }
+    @keyframes slideIn {
+        from {
+            transform: translateX(100%);
+            opacity: 0;
+        }
+        to {
+            transform: translateX(0);
+            opacity: 1;
+        }
+    }
+    @keyframes slideOut {
+        from {
+            transform: translateX(0);
+            opacity: 1;
+        }
+        to {
+            transform: translateX(100%);
+            opacity: 0;
+        }
+    }
 </style>
 @endpush
 
 @push('scripts')
 <script>
+    let deleteUrl = '';
+    
+    function showNotification(message, type = 'success') {
+        // Hapus notifikasi yang sudah ada
+        $('.notification-toast').remove();
+        
+        // Tentukan warna berdasarkan tipe
+        const bgColor = type === 'success' ? '#28a745' : '#dc3545';
+        const icon = type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle';
+        
+        // Buat elemen notifikasi
+        const notification = $(`
+            <div class="notification-toast alert alert-${type === 'success' ? 'success' : 'danger'} shadow-lg">
+                <div class="d-flex align-items-center">
+                    <div class="me-3">
+                        <i class="fas ${icon} fa-2x"></i>
+                    </div>
+                    <div class="flex-grow-1">
+                        <strong>${type === 'success' ? 'Berhasil!' : 'Error!'}</strong><br>
+                        ${message}
+                    </div>
+                    <button type="button" class="btn-close" onclick="$(this).closest('.notification-toast').remove()"></button>
+                </div>
+            </div>
+        `).css({
+            'background-color': bgColor,
+            'color': 'white',
+            'border': 'none',
+            'border-radius': '8px'
+        });
+        
+        $('body').append(notification);
+        
+        // Auto hide setelah 3 detik
+        setTimeout(() => {
+            if (notification.length) {
+                notification.css('animation', 'slideOut 0.3s ease-out');
+                setTimeout(() => notification.remove(), 300);
+            }
+        }, 3000);
+    }
+    
     function resetForm() {
         $('#categoryForm')[0].reset();
         $('#category_id').val('');
@@ -148,7 +248,7 @@
         $('.is-invalid').removeClass('is-invalid');
         $('.invalid-feedback').text('');
     }
-
+    
     function editCategory(category) {
         resetForm();
         $('#category_id').val(category.id);
@@ -157,7 +257,50 @@
         $('#modalTitle').html('<i class="fas fa-edit"></i> Edit Category Forms');
         $('#categoryModal').modal('show');
     }
-
+    
+    function deleteConfirm(url, categoryName) {
+        deleteUrl = url;
+        $('#deleteCategoryName').text(categoryName);
+        $('#deleteModal').modal('show');
+    }
+    
+    // Handle delete confirmation
+    $('#confirmDeleteBtn').on('click', function() {
+        const btn = $(this);
+        const originalText = btn.html();
+        
+        // Show loading state
+        btn.html('<i class="fas fa-spinner fa-spin"></i> Menghapus...').prop('disabled', true);
+        
+        $.ajax({
+            url: deleteUrl,
+            type: 'DELETE',
+            data: {
+                _token: '{{ csrf_token() }}'
+            },
+            success: function(response) {
+                showNotification(response.message, 'success');
+                $('#deleteModal').modal('hide');
+                // Reload after 1.5 seconds
+                setTimeout(() => {
+                    location.reload();
+                }, 1500);
+            },
+            error: function(xhr) {
+                btn.html(originalText).prop('disabled', false);
+                let errorMessage = 'Terjadi kesalahan saat menghapus kategori';
+                
+                if (xhr.responseJSON && xhr.responseJSON.message) {
+                    errorMessage = xhr.responseJSON.message;
+                } else if (xhr.status === 500) {
+                    errorMessage = 'Server error. Silakan coba lagi nanti.';
+                }
+                
+                showNotification(errorMessage, 'error');
+            }
+        });
+    });
+    
     $('#categoryForm').on('submit', function(e) {
         e.preventDefault();
         
@@ -169,12 +312,12 @@
         const url = id ? `/admin/categories/${id}` : '/admin/categories';
         const method = id ? 'PUT' : 'POST';
         const formData = $(this).serialize();
-
+        
         // Show loading state
         const submitBtn = $(this).find('button[type="submit"]');
         const originalText = submitBtn.html();
         submitBtn.html('<i class="fas fa-spinner fa-spin"></i> Saving...').prop('disabled', true);
-
+        
         $.ajax({
             url: url,
             type: method,

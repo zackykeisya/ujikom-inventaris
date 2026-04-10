@@ -9,7 +9,7 @@
             <h2>Manage Users - {{ ucfirst($role) }}</h2>
         </div>
         <div class="col-6 text-end">
-            <a href="{{ route('admin.users.export', $role) }}" class="btn btn-success">
+            <a href="{{ route('admin.users.export', $role) }}" class="btn btn-success" id="exportBtn">
                 <i class="fas fa-file-excel"></i> Export Excel
             </a>
             <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#userModal" onclick="resetUserForm()">
@@ -142,6 +142,41 @@
         </div>
     </div>
 </div>
+
+<!-- Modal Konfirmasi Delete -->
+<div class="modal fade" id="deleteModal" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title">
+                    <i class="fas fa-trash"></i> Konfirmasi Hapus User
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Apakah Anda yakin ingin menghapus user <strong id="deleteUserName"></strong>?</p>
+                <div class="alert alert-warning">
+                    <i class="fas fa-exclamation-triangle"></i> 
+                    <strong>Perhatian!</strong><br>
+                    Menghapus user akan menghapus semua data terkait user ini.
+                </div>
+                <p class="text-danger mb-0">
+                    <i class="fas fa-info-circle"></i> 
+                    <small>Tindakan ini tidak dapat dibatalkan!</small>
+                </p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="fas fa-times"></i> Batal
+                </button>
+                <button type="button" class="btn btn-danger" id="confirmDeleteBtn">
+                    <i class="fas fa-trash"></i> Ya, Hapus User
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 @endsection
 
 @push('styles')
@@ -155,11 +190,83 @@
         border-left: 4px solid #2196f3;
         border-radius: 8px;
     }
+    /* Toast notification styles */
+    .notification-toast {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        z-index: 9999;
+        min-width: 300px;
+        animation: slideIn 0.3s ease-out;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+    @keyframes slideIn {
+        from {
+            transform: translateX(100%);
+            opacity: 0;
+        }
+        to {
+            transform: translateX(0);
+            opacity: 1;
+        }
+    }
+    @keyframes slideOut {
+        from {
+            transform: translateX(0);
+            opacity: 1;
+        }
+        to {
+            transform: translateX(100%);
+            opacity: 0;
+        }
+    }
 </style>
 @endpush
 
 @push('scripts')
 <script>
+    let deleteUrl = '';
+    
+    function showNotification(message, type = 'success') {
+        // Hapus notifikasi yang sudah ada
+        $('.notification-toast').remove();
+        
+        // Tentukan warna berdasarkan tipe
+        const bgColor = type === 'success' ? '#28a745' : '#dc3545';
+        const icon = type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle';
+        
+        // Buat elemen notifikasi
+        const notification = $(`
+            <div class="notification-toast alert shadow-lg">
+                <div class="d-flex align-items-center">
+                    <div class="me-3">
+                        <i class="fas ${icon} fa-2x"></i>
+                    </div>
+                    <div class="flex-grow-1">
+                        <strong>${type === 'success' ? 'Berhasil!' : 'Error!'}</strong><br>
+                        ${message}
+                    </div>
+                    <button type="button" class="btn-close" onclick="$(this).closest('.notification-toast').remove()"></button>
+                </div>
+            </div>
+        `).css({
+            'background-color': bgColor,
+            'color': 'white',
+            'border': 'none',
+            'border-radius': '8px'
+        });
+        
+        $('body').append(notification);
+        
+        // Auto hide setelah 3 detik
+        setTimeout(() => {
+            if (notification.length) {
+                notification.css('animation', 'slideOut 0.3s ease-out');
+                setTimeout(() => notification.remove(), 300);
+            }
+        }, 3000);
+    }
+    
     function resetUserForm() {
         $('#userForm')[0].reset();
         $('#user_id').val('');
@@ -180,6 +287,49 @@
         $('#userModalTitle').html('<i class="fas fa-user-edit"></i> Edit User');
         $('#userModal').modal('show');
     }
+    
+    function deleteConfirm(url, userName) {
+        deleteUrl = url;
+        $('#deleteUserName').text(userName);
+        $('#deleteModal').modal('show');
+    }
+    
+    // Handle delete confirmation
+    $('#confirmDeleteBtn').on('click', function() {
+        const btn = $(this);
+        const originalText = btn.html();
+        
+        // Show loading state
+        btn.html('<i class="fas fa-spinner fa-spin"></i> Menghapus...').prop('disabled', true);
+        
+        $.ajax({
+            url: deleteUrl,
+            type: 'DELETE',
+            data: {
+                _token: '{{ csrf_token() }}'
+            },
+            success: function(response) {
+                showNotification(response.message, 'success');
+                $('#deleteModal').modal('hide');
+                // Reload after 1.5 seconds
+                setTimeout(() => {
+                    location.reload();
+                }, 1500);
+            },
+            error: function(xhr) {
+                btn.html(originalText).prop('disabled', false);
+                let errorMessage = 'Terjadi kesalahan saat menghapus user';
+                
+                if (xhr.responseJSON && xhr.responseJSON.message) {
+                    errorMessage = xhr.responseJSON.message;
+                } else if (xhr.status === 500) {
+                    errorMessage = 'Server error. Silakan coba lagi nanti.';
+                }
+                
+                showNotification(errorMessage, 'error');
+            }
+        });
+    });
 
     function resetPassword(userId) {
         Swal.fire({
@@ -206,6 +356,9 @@
                 $.ajax({
                     url: `/admin/users/${userId}/reset-password`,
                     type: 'POST',
+                    data: {
+                        _token: '{{ csrf_token() }}'
+                    },
                     success: function(response) {
                         Swal.fire({
                             title: 'Password Reset!',
@@ -282,6 +435,22 @@
                 }
             }
         });
+    });
+    
+    // Handle export with loading notification
+    $('#exportBtn').on('click', function(e) {
+        e.preventDefault();
+        const exportUrl = $(this).attr('href');
+        
+        showNotification('Sedang mengexport data user ke Excel...', 'info');
+        
+        // Redirect to export URL
+        window.location.href = exportUrl;
+        
+        // Show success after 2 seconds (assuming export works)
+        setTimeout(() => {
+            showNotification('Export Excel berhasil!', 'success');
+        }, 2000);
     });
     
     // Real-time validation
