@@ -41,7 +41,16 @@
                             <td>{{ $item->name }}</td>
                             <td>{{ $item->category->name ?? 'No Category' }}</td>
                             <td>{{ $item->total }}</td>
-                            <td>{{ $item->lending_total }}</td>
+                            <td>
+                                <button type="button" 
+                                        class="btn btn-sm btn-info text-white btn-lending-detail"
+                                        data-item-id="{{ $item->id }}"
+                                        data-item-name="{{ $item->name }}"
+                                        style="background-color: #17a2b8;">
+                                    <i class="fas fa-hand-holding"></i> 
+                                    {{ $item->lending_total }} Peminjaman
+                                </button>
+                            </td>
                             <td>{{ $item->broken }}</td>
                             <td>
                                 <span class="badge bg-{{ $item->available > 0 ? 'success' : 'danger' }}">
@@ -143,6 +152,49 @@
     </div>
 </div>
 
+<!-- Modal for Lending Details -->
+<div class="modal fade" id="lendingModal" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-info text-white">
+                <h5 class="modal-title">
+                    <i class="fas fa-hand-holding"></i> Detail Peminjaman Item
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <strong>Item:</strong> <span id="modal_item_name"></span>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-bordered table-hover">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>No</th>
+                                <th>Peminjam</th>
+                                <th>Quantity</th>
+                                <th>Tanggal Pinjam</th>
+                                <th>Tanggal Kembali</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="lending_table_body">
+                            <tr>
+                                <td colspan="6" class="text-center">Loading...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="fas fa-times"></i> Tutup
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Modal Konfirmasi Delete -->
 <div class="modal fade" id="deleteModal" tabindex="-1" data-bs-backdrop="static">
     <div class="modal-dialog">
@@ -236,8 +288,8 @@
         $('.notification-toast').remove();
         
         // Tentukan warna berdasarkan tipe
-        const bgColor = type === 'success' ? '#28a745' : '#dc3545';
-        const icon = type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle';
+        const bgColor = type === 'success' ? '#28a745' : type === 'error' ? '#dc3545' : '#17a2b8';
+        const icon = type === 'success' ? 'fa-check-circle' : type === 'error' ? 'fa-exclamation-circle' : 'fa-info-circle';
         
         // Buat elemen notifikasi
         const notification = $(`
@@ -247,7 +299,7 @@
                         <i class="fas ${icon} fa-2x"></i>
                     </div>
                     <div class="flex-grow-1">
-                        <strong>${type === 'success' ? 'Berhasil!' : 'Error!'}</strong><br>
+                        <strong>${type === 'success' ? 'Berhasil!' : type === 'error' ? 'Error!' : 'Info!'}</strong><br>
                         ${message}
                     </div>
                     <button type="button" class="btn-close" onclick="$(this).closest('.notification-toast').remove()"></button>
@@ -298,6 +350,72 @@
         $('#deleteItemName').text(itemName);
         $('#deleteModal').modal('show');
     }
+    
+    // Function to show lending details
+    function showLendingDetails(itemId, itemName) {
+        $('#modal_item_name').text(itemName);
+        $('#lendingModal').modal('show');
+        $('#lending_table_body').html('<tr><td colspan="6" class="text-center"><i class="fas fa-spinner fa-spin"></i> Loading...</td></tr>');
+        
+        $.ajax({
+            url: '/admin/items/' + itemId + '/lendings',
+            type: 'GET',
+            success: function(response) {
+                if (response.lendings && response.lendings.length > 0) {
+                    let html = '';
+                    response.lendings.forEach((lending, index) => {
+                        // Tentukan status berdasarkan tanggal kembali
+                        let statusBadge = '';
+                        let statusText = '';
+                        const today = new Date();
+                        const returnDate = lending.return_date ? new Date(lending.return_date) : null;
+                        
+                        if (lending.return_date && returnDate < today) {
+                            statusBadge = 'bg-danger';
+                            statusText = 'Terlambat';
+                        } else if (lending.return_date) {
+                            statusBadge = 'bg-success';
+                            statusText = 'Sudah Kembali';
+                        } else {
+                            statusBadge = 'bg-warning';
+                            statusText = 'Dipinjam';
+                        }
+                        
+                        html += `
+                            <tr>
+                                <td class="text-center">${index + 1}</td>
+                                <td>${lending.borrower_name || '-'}</td>
+                                <td class="text-center">${lending.total || 0}</td>
+                                <td class="text-center">${lending.lending_date ? new Date(lending.lending_date).toLocaleDateString('id-ID') : '-'}</td>
+                                <td class="text-center">${lending.return_date ? new Date(lending.return_date).toLocaleDateString('id-ID') : '-'}</td>
+                                <td class="text-center"><span class="badge ${statusBadge}">${statusText}</span></td>
+                            </tr>
+                        `;
+                    });
+                    $('#lending_table_body').html(html);
+                } else {
+                    $('#lending_table_body').html('<tr><td colspan="6" class="text-center text-muted"><i class="fas fa-info-circle"></i> Tidak ada data peminjaman untuk item ini</td></tr>');
+                }
+            },
+            error: function(xhr) {
+                console.error('Error:', xhr);
+                let errorMsg = 'Gagal memuat data peminjaman';
+                if (xhr.responseJSON && xhr.responseJSON.message) {
+                    errorMsg = xhr.responseJSON.message;
+                }
+                $('#lending_table_body').html(`<tr><td colspan="6" class="text-center text-danger"><i class="fas fa-exclamation-triangle"></i> ${errorMsg}</td></tr>`);
+                showNotification(errorMsg, 'error');
+            }
+        });
+    }
+    
+    // Event handler untuk tombol lending detail
+    $(document).on('click', '.btn-lending-detail', function(e) {
+        e.preventDefault();
+        const itemId = $(this).data('item-id');
+        const itemName = $(this).data('item-name');
+        showLendingDetails(itemId, itemName);
+    });
     
     // Handle delete confirmation
     $('#confirmDeleteBtn').on('click', function() {
@@ -356,7 +474,7 @@
             type: method,
             data: formData,
             success: function(response) {
-                showNotification(response.message);
+                showNotification(response.message, 'success');
                 $('#itemModal').modal('hide');
                 setTimeout(() => location.reload(), 2000);
             },

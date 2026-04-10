@@ -34,6 +34,9 @@ Route::middleware(['auth', 'role:admin'])->prefix('admin')->group(function () {
     Route::delete('/items/{item}', [ItemController::class, 'destroy'])->name('admin.items.destroy');
     Route::get('/items/export', [ItemController::class, 'export'])->name('admin.items.export');
     
+    // TAMBAHKAN ROUTE INI UNTUK LENDING DETAILS
+    Route::get('/items/{item}/lendings', [ItemController::class, 'getLendings'])->name('admin.items.lendings');
+
     // Users
     Route::get('/users/{role}', [UserController::class, 'index'])->name('admin.users');
     Route::post('/users', [UserController::class, 'store'])->name('admin.users.store');

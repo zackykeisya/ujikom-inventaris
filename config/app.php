@@ -65,8 +65,8 @@ return [
     |
     */
 
-    'timezone' => 'UTC',
-
+    'timezone' => 'Asia/Jakarta', // Ubah dari 'UTC' menjadi 'Asia/Jakarta'
+    
     /*
     |--------------------------------------------------------------------------
     | Application Locale Configuration

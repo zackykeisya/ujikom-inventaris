@@ -22,6 +22,23 @@ class ItemController extends Controller
         return view('admin.items', compact('items', 'categories'));
     }
 
+    /**
+     * Get lending details for a specific item
+     */
+    public function getLendings(Item $item)
+    {
+        // Ambil data peminjaman berdasarkan item_id
+        $lendings = $item->lendings()
+            ->orderBy('lending_date', 'desc')
+            ->get();
+        
+        return response()->json([
+            'success' => true,
+            'item' => $item,
+            'lendings' => $lendings
+        ]);
+    }
+
     public function store(Request $request)
     {
         $request->validate([
