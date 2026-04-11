@@ -49,9 +49,9 @@
                             <td>{{ $lending->borrower_name }}</td>
                             <td>{{ $lending->item->name }}</td>
                             <td>{{ $lending->total }}</td>
-                            <td>{{ $lending->lending_date->format('d M Y') }}</td>
+                            <td>{{ $lending->lending_date ? $lending->lending_date->format('d M Y H:i') : '-' }}</td>
                             <td>
-                                {{ $lending->return_date ? $lending->return_date->format('d M Y') : '-' }}
+                                {{ $lending->return_date ? $lending->return_date->format('d M Y H:i') : '-' }}
                             </td>
                             <td>
                                 @if($lending->return_date)
@@ -106,10 +106,10 @@
                     
                     <div class="mb-3">
                         <label for="lending_date" class="form-label fw-bold">
-                            <i class="fas fa-calendar"></i> Lending Date
+                            <i class="fas fa-calendar"></i> Lending Date & Time
                         </label>
-                        <input type="date" class="form-control" id="lending_date" name="lending_date" 
-                               value="{{ date('Y-m-d') }}" required>
+                        <input type="datetime-local" class="form-control" id="lending_date" name="lending_date" 
+                               value="{{ date('Y-m-d\TH:i') }}" required>
                         <div class="invalid-feedback"></div>
                     </div>
                     
@@ -254,8 +254,8 @@
     function showNotification(message, type = 'success') {
         $('.notification-toast').remove();
         
-        const bgColor = type === 'success' ? '#28a745' : '#dc3545';
-        const icon = type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle';
+        const bgColor = type === 'success' ? '#28a745' : type === 'error' ? '#dc3545' : '#17a2b8';
+        const icon = type === 'success' ? 'fa-check-circle' : type === 'error' ? 'fa-exclamation-circle' : 'fa-info-circle';
         
         const notification = $(`
             <div class="notification-toast alert shadow-lg">
@@ -264,7 +264,7 @@
                         <i class="fas ${icon} fa-2x"></i>
                     </div>
                     <div class="flex-grow-1">
-                        <strong>${type === 'success' ? 'Berhasil!' : 'Error!'}</strong><br>
+                        <strong>${type === 'success' ? 'Berhasil!' : type === 'error' ? 'Error!' : 'Info!'}</strong><br>
                         ${message}
                     </div>
                     <button type="button" class="btn-close" onclick="$(this).closest('.notification-toast').remove()"></button>
@@ -329,7 +329,17 @@
 
     function resetLendingForm() {
         $('#lendingForm')[0].reset();
-        $('#lending_date').val(new Date().toISOString().split('T')[0]);
+        
+        // Format datetime-local: YYYY-MM-DDThh:mm
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const day = String(now.getDate()).padStart(2, '0');
+        const hours = String(now.getHours()).padStart(2, '0');
+        const minutes = String(now.getMinutes()).padStart(2, '0');
+        const datetime = `${year}-${month}-${day}T${hours}:${minutes}`;
+        
+        $('#lending_date').val(datetime);
         
         $('#items_container').html(`
             <div class="item-row row mb-2">
@@ -489,7 +499,7 @@
             type: 'POST',
             data: $(this).serialize(),
             success: function(response) {
-                showNotification(response.message);
+                showNotification(response.message, 'success');
                 $('#lendingModal').modal('hide');
                 setTimeout(() => location.reload(), 2000);
             },
@@ -533,7 +543,7 @@
                     },
                     success: function(response) {
                         Swal.close();
-                        showNotification(response.message);
+                        showNotification(response.message, 'success');
                         setTimeout(() => location.reload(), 2000);
                     },
                     error: function(xhr) {

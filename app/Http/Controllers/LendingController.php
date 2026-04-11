@@ -110,18 +110,64 @@ class LendingController extends Controller
             // Set title
             $sheet->setTitle('Lendings Data');
             
-            // Set headers
-            $sheet->setCellValue('A1', 'No');
-            $sheet->setCellValue('B1', 'Borrower Name');
-            $sheet->setCellValue('C1', 'Item Name');
-            $sheet->setCellValue('D1', 'Category');
-            $sheet->setCellValue('E1', 'Total Borrowed');
-            $sheet->setCellValue('F1', 'Lending Date');
-            $sheet->setCellValue('G1', 'Return Date');
-            $sheet->setCellValue('H1', 'Status');
-            $sheet->setCellValue('I1', 'Days Borrowed');
+            // ============ TAMBAHKAN JUDUL ============
+            // Judul Utama
+            $sheet->setCellValue('A1', 'LAPORAN DATA PEMINJAMAN BARANG');
+            $sheet->mergeCells('A1:I1'); // Merge dari kolom A sampai I
             
-            // Style header
+            // Sub judul / informasi tambahan
+            $sheet->setCellValue('A2', 'Tanggal Export: ' . date('d F Y H:i:s'));
+            $sheet->mergeCells('A2:I2');
+            
+            $sheet->setCellValue('A3', 'Total Peminjaman: ' . $lendings->count() . ' transaksi');
+            $sheet->mergeCells('A3:I3');
+            
+            // Style untuk judul
+            $titleStyle = [
+                'font' => [
+                    'bold' => true,
+                    'size' => 14,
+                    'color' => ['rgb' => 'FFFFFF']
+                ],
+                'fill' => [
+                    'fillType' => Fill::FILL_SOLID,
+                    'startColor' => ['rgb' => '2E75B6']
+                ],
+                'alignment' => [
+                    'horizontal' => Alignment::HORIZONTAL_CENTER,
+                    'vertical' => Alignment::VERTICAL_CENTER
+                ]
+            ];
+            
+            $sheet->getStyle('A1:I1')->applyFromArray($titleStyle);
+            $sheet->getRowDimension(1)->setRowHeight(25);
+            
+            // Style untuk sub judul
+            $subTitleStyle = [
+                'font' => [
+                    'size' => 10,
+                    'color' => ['rgb' => '333333']
+                ],
+                'alignment' => [
+                    'horizontal' => Alignment::HORIZONTAL_LEFT,
+                    'vertical' => Alignment::VERTICAL_CENTER
+                ]
+            ];
+            
+            $sheet->getStyle('A2:I3')->applyFromArray($subTitleStyle);
+            
+            // Set headers di baris ke-5 (setelah judul dan sub judul)
+            $sheet->setCellValue('A5', 'No');
+            $sheet->setCellValue('B5', 'Borrower Name');
+            $sheet->setCellValue('C5', 'Item Name');
+            $sheet->setCellValue('D5', 'Category');
+            $sheet->setCellValue('E5', 'Total Borrowed');
+            $sheet->setCellValue('F5', 'Lending Date');
+            $sheet->setCellValue('G5', 'Return Date');
+            $sheet->setCellValue('H5', 'Status');
+            $sheet->setCellValue('I5', 'Days Borrowed');
+            
+            // Style header (di baris 5)
             $headerStyle = [
                 'font' => [
                     'bold' => true,
@@ -144,7 +190,7 @@ class LendingController extends Controller
                 ]
             ];
             
-            $sheet->getStyle('A1:I1')->applyFromArray($headerStyle);
+            $sheet->getStyle('A5:I5')->applyFromArray($headerStyle);
             
             // Set column widths
             $sheet->getColumnDimension('A')->setWidth(5);
@@ -152,13 +198,13 @@ class LendingController extends Controller
             $sheet->getColumnDimension('C')->setWidth(30);
             $sheet->getColumnDimension('D')->setWidth(20);
             $sheet->getColumnDimension('E')->setWidth(15);
-            $sheet->getColumnDimension('F')->setWidth(15);
-            $sheet->getColumnDimension('G')->setWidth(15);
+            $sheet->getColumnDimension('F')->setWidth(20);
+            $sheet->getColumnDimension('G')->setWidth(20);
             $sheet->getColumnDimension('H')->setWidth(12);
-            $sheet->getColumnDimension('I')->setWidth(12);
+            $sheet->getColumnDimension('I')->setWidth(15);
             
-            // Add data
-            $row = 2;
+            // Add data mulai dari baris ke-6
+            $row = 6;
             $no = 1;
             
             foreach ($lendings as $lending) {
@@ -172,8 +218,9 @@ class LendingController extends Controller
                 $sheet->setCellValue('C' . $row, $lending->item->name ?? 'Item Tidak Ditemukan');
                 $sheet->setCellValue('D' . $row, $lending->item->category->name ?? '-');
                 $sheet->setCellValue('E' . $row, $lending->total);
-                $sheet->setCellValue('F' . $row, $lending->lending_date->format('d/m/Y'));
-                $sheet->setCellValue('G' . $row, $lending->return_date ? $lending->return_date->format('d/m/Y') : '-');
+                // Format datetime dengan jam dan menit
+                $sheet->setCellValue('F' . $row, $lending->lending_date ? $lending->lending_date->format('d/m/Y H:i:s') : '-');
+                $sheet->setCellValue('G' . $row, $lending->return_date ? $lending->return_date->format('d/m/Y H:i:s') : '-');
                 $sheet->setCellValue('H' . $row, $lending->return_date ? 'Returned' : 'Borrowed');
                 $sheet->setCellValue('I' . $row, $lending->return_date ? $daysBorrowed . ' hari' : $daysBorrowed . ' hari (belum kembali)');
                 
@@ -206,8 +253,8 @@ class LendingController extends Controller
             
             // Apply borders to data cells
             $lastRow = $row - 1;
-            if ($lastRow >= 2) {
-                $sheet->getStyle('A2:I' . $lastRow)->applyFromArray([
+            if ($lastRow >= 6) {
+                $sheet->getStyle('A6:I' . $lastRow)->applyFromArray([
                     'borders' => [
                         'allBorders' => [
                             'borderStyle' => Border::BORDER_THIN,
@@ -220,12 +267,15 @@ class LendingController extends Controller
                 ]);
                 
                 // Center alignment for specific columns
-                $sheet->getStyle('A2:A' . $lastRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
-                $sheet->getStyle('E2:I' . $lastRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+                $sheet->getStyle('A6:A' . $lastRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+                $sheet->getStyle('E6:I' . $lastRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
             }
             
-            // Set row height
-            $sheet->getRowDimension(1)->setRowHeight(20);
+            // Set row height untuk header
+            $sheet->getRowDimension(5)->setRowHeight(20);
+            
+            // Freeze pane agar judul tetap terlihat saat scroll
+            $sheet->freezePane('A6');
             
             // Create Excel file
             $writer = new Xlsx($spreadsheet);

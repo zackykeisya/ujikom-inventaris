@@ -110,15 +110,62 @@ class UserController extends Controller
             // Set title
             $sheet->setTitle('Users - ' . ucfirst($role));
             
-            // Set headers
-            $sheet->setCellValue('A1', 'No');
-            $sheet->setCellValue('B1', 'Name');
-            $sheet->setCellValue('C1', 'Email');
-            $sheet->setCellValue('D1', 'Role');
-            $sheet->setCellValue('E1', 'Created At');
-            $sheet->setCellValue('F1', 'Last Updated');
+            // ============ TAMBAHKAN JUDUL ============
+            // Judul Utama
+            $roleText = $role == 'admin' ? 'ADMIN' : 'STAFF';
+            $sheet->setCellValue('A1', 'LAPORAN DATA USER - ' . $roleText);
+            $sheet->mergeCells('A1:F1'); // Merge dari kolom A sampai F
             
-            // Style header
+            // Sub judul / informasi tambahan
+            $sheet->setCellValue('A2', 'Tanggal Export: ' . date('d F Y H:i:s'));
+            $sheet->mergeCells('A2:F2');
+            
+            $sheet->setCellValue('A3', 'Total User: ' . $users->count() . ' ' . $roleText);
+            $sheet->mergeCells('A3:F3');
+            
+            // Style untuk judul
+            $titleStyle = [
+                'font' => [
+                    'bold' => true,
+                    'size' => 14,
+                    'color' => ['rgb' => 'FFFFFF']
+                ],
+                'fill' => [
+                    'fillType' => Fill::FILL_SOLID,
+                    'startColor' => ['rgb' => '2E75B6']
+                ],
+                'alignment' => [
+                    'horizontal' => Alignment::HORIZONTAL_CENTER,
+                    'vertical' => Alignment::VERTICAL_CENTER
+                ]
+            ];
+            
+            $sheet->getStyle('A1:F1')->applyFromArray($titleStyle);
+            $sheet->getRowDimension(1)->setRowHeight(25);
+            
+            // Style untuk sub judul
+            $subTitleStyle = [
+                'font' => [
+                    'size' => 10,
+                    'color' => ['rgb' => '333333']
+                ],
+                'alignment' => [
+                    'horizontal' => Alignment::HORIZONTAL_LEFT,
+                    'vertical' => Alignment::VERTICAL_CENTER
+                ]
+            ];
+            
+            $sheet->getStyle('A2:F3')->applyFromArray($subTitleStyle);
+            
+            // Set headers di baris ke-5
+            $sheet->setCellValue('A5', 'No');
+            $sheet->setCellValue('B5', 'Name');
+            $sheet->setCellValue('C5', 'Email');
+            $sheet->setCellValue('D5', 'Role');
+            $sheet->setCellValue('E5', 'Created At');
+            $sheet->setCellValue('F5', 'Last Updated');
+            
+            // Style header (di baris 5)
             $headerStyle = [
                 'font' => [
                     'bold' => true,
@@ -141,7 +188,7 @@ class UserController extends Controller
                 ]
             ];
             
-            $sheet->getStyle('A1:F1')->applyFromArray($headerStyle);
+            $sheet->getStyle('A5:F5')->applyFromArray($headerStyle);
             
             // Set column widths
             $sheet->getColumnDimension('A')->setWidth(5);
@@ -151,8 +198,8 @@ class UserController extends Controller
             $sheet->getColumnDimension('E')->setWidth(20);
             $sheet->getColumnDimension('F')->setWidth(20);
             
-            // Add data
-            $row = 2;
+            // Add data mulai dari baris ke-6
+            $row = 6;
             $no = 1;
             
             foreach ($users as $user) {
@@ -192,8 +239,8 @@ class UserController extends Controller
             
             // Apply borders to data cells
             $lastRow = $row - 1;
-            if ($lastRow >= 2) {
-                $sheet->getStyle('A2:F' . $lastRow)->applyFromArray([
+            if ($lastRow >= 6) {
+                $sheet->getStyle('A6:F' . $lastRow)->applyFromArray([
                     'borders' => [
                         'allBorders' => [
                             'borderStyle' => Border::BORDER_THIN,
@@ -206,19 +253,22 @@ class UserController extends Controller
                 ]);
                 
                 // Center alignment for specific columns
-                $sheet->getStyle('A2:A' . $lastRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
-                $sheet->getStyle('D2:F' . $lastRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+                $sheet->getStyle('A6:A' . $lastRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+                $sheet->getStyle('D6:F' . $lastRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
             }
             
-            // Set row height
-            $sheet->getRowDimension(1)->setRowHeight(20);
+            // Set row height untuk header
+            $sheet->getRowDimension(5)->setRowHeight(20);
+            
+            // Freeze pane agar judul tetap terlihat saat scroll
+            $sheet->freezePane('A6');
             
             // Create Excel file
             $writer = new Xlsx($spreadsheet);
             
             // Set headers for download
             header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-            header('Content-Disposition: attachment; filename="users_' . $role . '_' . date('Y-m-d_His') . '.xlsx"');
+            header('Content-Disposition: attachment; filename="users_' . $role . '_export_' . date('Y-m-d_His') . '.xlsx"');
             header('Cache-Control: max-age=0');
             header('Expires: 0');
             header('Pragma: public');
